@@ -1,0 +1,54 @@
+{
+    "name": "fibtegis/filament-infinite-scroll",
+    "description": "Seamless infinite scrolling plugin that replaces pagination in Filament Tables.",
+    "keywords": ["filament", "tables", "infinite-scroll", "lazy-loading", "fibtegis", "pagination"],
+    "homepage": "https://github.com/fibtegis/filament-infinite-scroll",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "İsmail KÖSE",
+            "email": "ismail@fbt.gs",
+            "role": "Founder"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "filament/filament": "^3.2.118|^4.0",
+        "illuminate/contracts": "^10.45|^11.0|^12.0",
+        "spatie/eloquent-sortable": "^4.0",
+        "spatie/laravel-package-tools": "^1.13.5"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "nunomaduro/collision": "^7.0|^8.1",
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "phpunit/phpunit": "^10.0|^11.5.3",
+        "spatie/laravel-ray": "^1.26"
+    },
+    "autoload": {
+        "psr-4": {
+            "Fibtegis\\FilamentInfiniteScroll\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "composer/package-versions-deprecated": true,
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Fibtegis\\FilamentInfiniteScroll\\FilamentInfiniteScrollServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
