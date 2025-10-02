@@ -72,8 +72,9 @@ The package includes sensible defaults, but you can customize everything via the
 
 ```php
 return [
-    // Enable/disable infinite scroll globally
-    'enabled' => true,
+    // Enable/disable infinite scroll globally (not recommended)
+    // Set to false to only enable for resources with HasInfiniteScroll trait
+    'enabled' => false,
 
     // Number of records to load per batch
     'per_page' => 25,
@@ -85,10 +86,10 @@ return [
     'loading_text' => 'Loading more records...',
     'end_text' => 'All records loaded',
 
-    // Auto-enable on resource index pages
+    // Auto-enable on resource index pages with the trait
     'auto_enable' => true,
 
-    // Exclude specific resources
+    // Exclude specific resources (when global enabled is true)
     'excluded_resources' => [
         // App\Nova\User::class,
     ],
@@ -183,10 +184,11 @@ In your `config/nova-infinite-scroll.php`:
 
 ### Infinite scroll not working?
 
-- Ensure the trait is added to your Resource
+- **Most Common**: Ensure the `HasInfiniteScroll` trait is added to your Resource
 - Check browser console for JavaScript errors
-- Verify `nova-infinite-scroll.enabled` is `true` in config
+- If using global mode, verify `nova-infinite-scroll.enabled` is `true` in config
 - Confirm the resource isn't in `excluded_resources`
+- Clear browser cache and reload the page
 
 ### Loading indicator doesn't show?
 
