@@ -20,6 +20,7 @@ Nova.booting((app, store) => {
                     hasMore: true,
                     threshold: 200,
                     originalSelectPage: null,
+                    resourceConfig: null,
                 },
             };
         },
@@ -43,15 +44,17 @@ Nova.booting((app, store) => {
              * Initialize infinite scroll functionality
              */
             initInfiniteScroll() {
-                // Check if infinite scroll should be enabled
-                const config = window.novaInfiniteScrollConfig;
+                // First check if this specific resource has infinite scroll enabled
+                const resourceConfig = this.getResourceInfiniteScrollConfig();
 
-                if (!config || config.enabled === false) {
+                if (!resourceConfig || resourceConfig.enabled === false) {
                     return;
                 }
 
-                this.infiniteScroll.enabled = config.autoEnable !== false;
-                this.infiniteScroll.threshold = config.threshold || 200;
+                // Store resource-specific config
+                this.infiniteScroll.resourceConfig = resourceConfig;
+                this.infiniteScroll.enabled = resourceConfig.autoEnable !== false;
+                this.infiniteScroll.threshold = resourceConfig.threshold || 200;
 
                 if (this.infiniteScroll.enabled) {
                     // Store the original selectPage method
@@ -65,6 +68,27 @@ Nova.booting((app, store) => {
                         this.hidePagination();
                     });
                 }
+            },
+
+            /**
+             * Get infinite scroll configuration for the current resource
+             */
+            getResourceInfiniteScrollConfig() {
+                // First, check if the resource provides its own config via additionalInformation
+                if (this.resourceInformation && this.resourceInformation.infiniteScroll) {
+                    return this.resourceInformation.infiniteScroll;
+                }
+
+                // Fallback to global config (for backward compatibility)
+                const globalConfig = window.novaInfiniteScrollConfig;
+
+                // Only use global config if it's explicitly enabled
+                // This prevents unintended activation on all resources
+                if (globalConfig && globalConfig.enabled === true && globalConfig.autoEnable === true) {
+                    return globalConfig;
+                }
+
+                return null;
             },
 
             /**
@@ -222,6 +246,18 @@ Nova.booting((app, store) => {
         },
 
         watch: {
+            // Watch for changes in resource information (e.g., when navigating to a different resource)
+            resourceInformation: {
+                handler(newVal, oldVal) {
+                    if (this.$options.name === 'ResourceIndex' && newVal !== oldVal) {
+                        // Reinitialize when resource information changes
+                        this.destroyInfiniteScroll();
+                        this.initInfiniteScroll();
+                    }
+                },
+                deep: true,
+            },
+
             // Only watch for ResourceIndex components
             resourceName(newVal, oldVal) {
                 if (this.$options.name === 'ResourceIndex' && this.infiniteScroll.enabled) {

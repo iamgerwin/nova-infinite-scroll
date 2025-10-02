@@ -2,6 +2,28 @@
 
 All notable changes to `nova-infinite-scroll` will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- **Per-Resource Detection**: Fixed critical issue where infinite scroll was not properly detecting which resources have the trait enabled
+- JavaScript now correctly checks resource-specific configuration via `additionalInformation` meta data
+- Pagination controls now properly hide only for resources with the trait
+- Global configuration no longer applies to all resources by default (breaking change, see below)
+
+### Changed
+
+- **BREAKING**: Default `enabled` config changed from `true` to `false` to prevent unintended global activation
+- Infinite scroll now requires explicit opt-in per resource using the `HasInfiniteScroll` trait (recommended approach)
+- Enhanced resource information watcher to reinitialize when navigating between resources
+- Improved configuration priority: resource-specific config now takes precedence over global config
+
+### Added
+
+- `additionalInformation()` method in trait to pass per-resource configuration to JavaScript
+- Resource-specific configuration detection in JavaScript mixin
+- Better backward compatibility with global configuration mode
+
 ## 1.0.0 - 2025-10-02
 
 ### Added

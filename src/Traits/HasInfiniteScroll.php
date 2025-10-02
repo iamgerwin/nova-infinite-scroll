@@ -65,4 +65,17 @@ trait HasInfiniteScroll
     {
         return static::infiniteScrollConfig();
     }
+
+    /**
+     * Get the additional meta values for the resource index.
+     *
+     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @return array<string, mixed>
+     */
+    public static function additionalInformation($request)
+    {
+        return array_merge(parent::additionalInformation($request) ?? [], [
+            'infiniteScroll' => static::infiniteScrollConfig(),
+        ]);
+    }
 }
