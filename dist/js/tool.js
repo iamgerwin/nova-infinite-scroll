@@ -9,10 +9,9 @@
  */
 
 Nova.booting((app, store) => {
-    // Extend ResourceIndex component to add infinite scroll functionality
-    app.component('ResourceIndex', {
-        extends: app.component('ResourceIndex'),
-
+    // Use a mixin to add infinite scroll functionality to ResourceIndex components
+    // This approach is more reliable than extending the component directly
+    app.mixin({
         data() {
             return {
                 infiniteScroll: {
@@ -20,16 +19,23 @@ Nova.booting((app, store) => {
                     loading: false,
                     hasMore: true,
                     threshold: 200,
+                    originalSelectPage: null,
                 },
             };
         },
 
         mounted() {
-            this.initInfiniteScroll();
+            // Only initialize for ResourceIndex components
+            if (this.$options.name === 'ResourceIndex') {
+                this.initInfiniteScroll();
+            }
         },
 
         beforeUnmount() {
-            this.destroyInfiniteScroll();
+            // Only cleanup for ResourceIndex components
+            if (this.$options.name === 'ResourceIndex') {
+                this.destroyInfiniteScroll();
+            }
         },
 
         methods: {
@@ -48,6 +54,12 @@ Nova.booting((app, store) => {
                 this.infiniteScroll.threshold = config.threshold || 200;
 
                 if (this.infiniteScroll.enabled) {
+                    // Store the original selectPage method
+                    this.infiniteScroll.originalSelectPage = this.selectPage;
+
+                    // Override selectPage method
+                    this.selectPage = this.infiniteScrollSelectPage;
+
                     this.$nextTick(() => {
                         this.attachScrollListener();
                         this.hidePagination();
@@ -105,7 +117,7 @@ Nova.booting((app, store) => {
                     // Get next page number
                     const nextPage = this.currentPage + 1;
 
-                    // Fetch next page using Nova's existing method
+                    // Fetch next page
                     await this.selectPage(nextPage);
 
                     // Check if there are more pages
@@ -152,15 +164,23 @@ Nova.booting((app, store) => {
                     this._scrollElement = null;
                     this._handleScroll = null;
                 }
+
+                // Restore original selectPage if it was overridden
+                if (this.infiniteScroll.originalSelectPage) {
+                    this.selectPage = this.infiniteScroll.originalSelectPage;
+                }
             },
 
             /**
-             * Override selectPage to append resources instead of replacing
+             * Custom selectPage that appends resources instead of replacing
              */
-            async selectPage(page) {
-                if (!this.infiniteScroll.enabled) {
-                    // Use default behavior if infinite scroll is disabled
-                    return this.$options.extends.methods.selectPage.call(this, page);
+            async infiniteScrollSelectPage(page) {
+                if (!this.infiniteScroll.enabled || !this.infiniteScroll.originalSelectPage) {
+                    // Fallback to original method
+                    if (this.infiniteScroll.originalSelectPage) {
+                        return this.infiniteScroll.originalSelectPage.call(this, page);
+                    }
+                    return;
                 }
 
                 this.loading = true;
@@ -189,57 +209,42 @@ Nova.booting((app, store) => {
             },
 
             /**
-             * Override getResources to handle infinite scroll parameters
+             * Reset infinite scroll state
              */
-            getResources(page = 1) {
-                return Nova.request().get('/nova-api/' + this.resourceName, {
-                    params: this.resourceRequestQueryString({
-                        page,
-                        perPage: this.perPage,
-                    }),
-                });
+            resetInfiniteScrollState() {
+                if (this.infiniteScroll) {
+                    this.infiniteScroll.hasMore = true;
+                    this.infiniteScroll.loading = false;
+                    this.currentPage = 1;
+                    this.resources = [];
+                }
             },
         },
 
         watch: {
-            // Reset infinite scroll state when filters, search, or sorting changes
-            resourceName() {
-                this.resetInfiniteScrollState();
+            // Only watch for ResourceIndex components
+            resourceName(newVal, oldVal) {
+                if (this.$options.name === 'ResourceIndex' && this.infiniteScroll.enabled) {
+                    this.resetInfiniteScrollState();
+                }
             },
 
             '$route.query': {
                 handler(newQuery, oldQuery) {
-                    // Only reset if the query actually changed (excluding page)
-                    const newQueryWithoutPage = { ...newQuery };
-                    const oldQueryWithoutPage = { ...oldQuery };
-                    delete newQueryWithoutPage.page;
-                    delete oldQueryWithoutPage.page;
+                    if (this.$options.name === 'ResourceIndex' && this.infiniteScroll.enabled) {
+                        // Only reset if the query actually changed (excluding page)
+                        const newQueryWithoutPage = { ...newQuery };
+                        const oldQueryWithoutPage = { ...oldQuery };
+                        delete newQueryWithoutPage.page;
+                        delete oldQueryWithoutPage.page;
 
-                    if (JSON.stringify(newQueryWithoutPage) !== JSON.stringify(oldQueryWithoutPage)) {
-                        this.resetInfiniteScrollState();
+                        if (JSON.stringify(newQueryWithoutPage) !== JSON.stringify(oldQueryWithoutPage)) {
+                            this.resetInfiniteScrollState();
+                        }
                     }
                 },
                 deep: true,
             },
         },
-
-        created() {
-            // Ensure we start at page 1
-            if (this.infiniteScroll && this.infiniteScroll.enabled) {
-                this.currentPage = 1;
-            }
-        },
     });
-
-    /**
-     * Helper method to reset infinite scroll state
-     */
-    app.config.globalProperties.resetInfiniteScrollState = function() {
-        if (this.infiniteScroll) {
-            this.infiniteScroll.hasMore = true;
-            this.infiniteScroll.loading = false;
-            this.currentPage = 1;
-            this.resources = [];
-        }
-    };
 });
