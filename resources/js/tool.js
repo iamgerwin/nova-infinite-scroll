@@ -8,151 +8,27 @@
  * @license MIT
  */
 
-Nova.booting((Vue, router, store) => {
-    // Register the infinite scroll component inline
-    Vue.component('infinite-scroll-wrapper', {
-        name: 'InfiniteScrollWrapper',
-        template: `
-            <div class="infinite-scroll-wrapper">
-                <slot></slot>
+Nova.booting((app, store) => {
+    // Extend ResourceIndex component to add infinite scroll functionality
+    app.component('ResourceIndex', {
+        extends: app.component('ResourceIndex'),
 
-                <!-- Loading indicator -->
-                <div v-if="loading" class="infinite-scroll-loading">
-                    <svg
-                        class="animate-spin h-8 w-8 text-primary-500 mx-auto"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                    >
-                        <circle
-                            class="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            stroke-width="4"
-                        ></circle>
-                        <path
-                            class="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                    </svg>
-                    <p class="text-center mt-2 text-gray-600 dark:text-gray-400">
-                        {{ loadingText }}
-                    </p>
-                </div>
-
-                <!-- End message -->
-                <div v-if="!hasMore && !loading && showEndMessage" class="infinite-scroll-end">
-                    <p class="text-center text-gray-500 dark:text-gray-400 py-4">
-                        {{ endText }}
-                    </p>
-                </div>
-
-                <!-- Scroll sentinel (invisible trigger element) -->
-                <div ref="sentinel" class="infinite-scroll-sentinel"></div>
-            </div>
-        `,
-        props: {
-            loading: {
-                type: Boolean,
-                default: false,
-            },
-            hasMore: {
-                type: Boolean,
-                default: true,
-            },
-            threshold: {
-                type: Number,
-                default: 200,
-            },
-            loadingText: {
-                type: String,
-                default: 'Loading more records...',
-            },
-            endText: {
-                type: String,
-                default: 'All records loaded',
-            },
-            showEndMessage: {
-                type: Boolean,
-                default: true,
-            },
-        },
-        data() {
-            return {
-                observer: null,
-            };
-        },
-        mounted() {
-            this.initObserver();
-        },
-        beforeDestroy() {
-            this.destroyObserver();
-        },
-        methods: {
-            initObserver() {
-                const options = {
-                    root: null,
-                    rootMargin: `${this.threshold}px`,
-                    threshold: 0.1,
-                };
-
-                this.observer = new IntersectionObserver(this.handleIntersection, options);
-
-                if (this.$refs.sentinel) {
-                    this.observer.observe(this.$refs.sentinel);
-                }
-            },
-            handleIntersection(entries) {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting && this.hasMore && !this.loading) {
-                        this.$emit('load-more');
-                    }
-                });
-            },
-            destroyObserver() {
-                if (this.observer) {
-                    this.observer.disconnect();
-                    this.observer = null;
-                }
-            },
-        },
-        watch: {
-            hasMore(newVal) {
-                if (!newVal) {
-                    this.destroyObserver();
-                } else if (!this.observer) {
-                    this.initObserver();
-                }
-            },
-        },
-    });
-
-    // Add infinite scroll mixin to resource index pages
-    Vue.mixin({
         data() {
             return {
                 infiniteScroll: {
                     enabled: false,
                     loading: false,
-                    page: 1,
                     hasMore: true,
-                    perPage: 25,
                     threshold: 200,
                 },
             };
         },
 
         mounted() {
-            // Initialize infinite scroll if on resource index page
-            if (this.$route && this.$route.name && this.$route.name.endsWith('-index')) {
-                this.initInfiniteScroll();
-            }
+            this.initInfiniteScroll();
         },
 
-        beforeDestroy() {
+        beforeUnmount() {
             this.destroyInfiniteScroll();
         },
 
@@ -161,15 +37,20 @@ Nova.booting((Vue, router, store) => {
              * Initialize infinite scroll functionality
              */
             initInfiniteScroll() {
-                const config = window.novaInfiniteScrollConfig || {};
+                // Check if infinite scroll should be enabled
+                const config = window.novaInfiniteScrollConfig;
+
+                if (!config || config.enabled === false) {
+                    return;
+                }
 
                 this.infiniteScroll.enabled = config.autoEnable !== false;
-                this.infiniteScroll.perPage = config.perPage || 25;
                 this.infiniteScroll.threshold = config.threshold || 200;
 
                 if (this.infiniteScroll.enabled) {
                     this.$nextTick(() => {
                         this.attachScrollListener();
+                        this.hidePagination();
                     });
                 }
             },
@@ -180,15 +61,16 @@ Nova.booting((Vue, router, store) => {
             attachScrollListener() {
                 const contentWrapper = document.querySelector('.content');
                 if (contentWrapper) {
-                    contentWrapper.addEventListener('scroll', this.handleScroll);
+                    this._handleScroll = this.handleInfiniteScroll.bind(this);
+                    contentWrapper.addEventListener('scroll', this._handleScroll);
                     this._scrollElement = contentWrapper;
                 }
             },
 
             /**
-             * Handle scroll event
+             * Handle scroll event for infinite loading
              */
-            handleScroll(event) {
+            handleInfiniteScroll(event) {
                 if (!this.infiniteScroll.enabled || this.infiniteScroll.loading || !this.infiniteScroll.hasMore) {
                     return;
                 }
@@ -199,90 +81,165 @@ Nova.booting((Vue, router, store) => {
 
                 // Check if we're near the bottom
                 if (scrollHeight - scrollPosition < this.infiniteScroll.threshold) {
-                    this.loadMoreRecords();
+                    this.loadMoreViaInfiniteScroll();
                 }
             },
 
             /**
-             * Load more records
+             * Load more records via infinite scroll
              */
-            async loadMoreRecords() {
+            async loadMoreViaInfiniteScroll() {
                 if (this.infiniteScroll.loading || !this.infiniteScroll.hasMore) {
                     return;
                 }
 
+                // Check if we're already on the last page
+                if (!this.hasMorePages) {
+                    this.infiniteScroll.hasMore = false;
+                    return;
+                }
+
                 this.infiniteScroll.loading = true;
-                this.infiniteScroll.page++;
 
                 try {
-                    // Call Nova's API to fetch more resources
-                    const response = await Nova.request().get(this.$route.path, {
-                        params: {
-                            ...this.$route.query,
-                            page: this.infiniteScroll.page,
-                            perPage: this.infiniteScroll.perPage,
-                        },
-                    });
+                    // Get next page number
+                    const nextPage = this.currentPage + 1;
 
-                    if (response.data && response.data.resources) {
-                        // Append new resources to existing ones
-                        if (this.resources && Array.isArray(this.resources)) {
-                            this.resources.push(...response.data.resources);
-                        }
+                    // Fetch next page using Nova's existing method
+                    await this.selectPage(nextPage);
 
-                        // Check if there are more records
-                        this.infiniteScroll.hasMore =
-                            response.data.resources.length >= this.infiniteScroll.perPage;
-                    }
+                    // Check if there are more pages
+                    this.infiniteScroll.hasMore = this.hasMorePages;
                 } catch (error) {
                     console.error('Error loading more records:', error);
-                    this.infiniteScroll.page--; // Revert page increment on error
                 } finally {
                     this.infiniteScroll.loading = false;
                 }
             },
 
             /**
+             * Hide pagination when infinite scroll is enabled
+             */
+            hidePagination() {
+                const style = document.createElement('style');
+                style.id = 'nova-infinite-scroll-pagination-hide';
+                style.textContent = `
+                    .nova-infinite-scroll-enabled .pagination-wrapper,
+                    .nova-infinite-scroll-enabled nav[role="navigation"] {
+                        display: none !important;
+                    }
+                `;
+
+                if (!document.getElementById('nova-infinite-scroll-pagination-hide')) {
+                    document.head.appendChild(style);
+                }
+
+                // Add class to resource index container
+                this.$nextTick(() => {
+                    const resourceIndex = this.$el.closest('.resource-index') || this.$el;
+                    if (resourceIndex) {
+                        resourceIndex.classList.add('nova-infinite-scroll-enabled');
+                    }
+                });
+            },
+
+            /**
              * Clean up scroll listener
              */
             destroyInfiniteScroll() {
-                if (this._scrollElement) {
-                    this._scrollElement.removeEventListener('scroll', this.handleScroll);
+                if (this._scrollElement && this._handleScroll) {
+                    this._scrollElement.removeEventListener('scroll', this._handleScroll);
                     this._scrollElement = null;
+                    this._handleScroll = null;
                 }
             },
 
             /**
-             * Toggle infinite scroll on/off
+             * Override selectPage to append resources instead of replacing
              */
-            toggleInfiniteScroll() {
-                this.infiniteScroll.enabled = !this.infiniteScroll.enabled;
-
-                if (this.infiniteScroll.enabled) {
-                    this.attachScrollListener();
-                } else {
-                    this.destroyInfiniteScroll();
+            async selectPage(page) {
+                if (!this.infiniteScroll.enabled) {
+                    // Use default behavior if infinite scroll is disabled
+                    return this.$options.extends.methods.selectPage.call(this, page);
                 }
+
+                this.loading = true;
+
+                try {
+                    const {
+                        data: { resources, softDeletes, perPage, total, prev_page_url, next_page_url },
+                    } = await this.getResources(page);
+
+                    // Append resources instead of replacing
+                    this.resources = [...this.resources, ...resources];
+                    this.softDeletes = softDeletes;
+                    this.perPage = perPage;
+                    this.currentPage = page;
+                    this.hasMorePages = !!next_page_url;
+
+                    Nova.$emit('resources-loaded', {
+                        resourceName: this.resourceName,
+                        mode: 'index',
+                    });
+                } catch (error) {
+                    console.error('Error fetching resources:', error);
+                }
+
+                this.loading = false;
             },
 
             /**
-             * Reset infinite scroll state
+             * Override getResources to handle infinite scroll parameters
              */
-            resetInfiniteScroll() {
-                this.infiniteScroll.page = 1;
-                this.infiniteScroll.hasMore = true;
-                this.infiniteScroll.loading = false;
+            getResources(page = 1) {
+                return Nova.request().get('/nova-api/' + this.resourceName, {
+                    params: this.resourceRequestQueryString({
+                        page,
+                        perPage: this.perPage,
+                    }),
+                });
             },
         },
 
         watch: {
-            // Reset when filters, search, or sorting changes
+            // Reset infinite scroll state when filters, search, or sorting changes
+            resourceName() {
+                this.resetInfiniteScrollState();
+            },
+
             '$route.query': {
-                handler() {
-                    this.resetInfiniteScroll();
+                handler(newQuery, oldQuery) {
+                    // Only reset if the query actually changed (excluding page)
+                    const newQueryWithoutPage = { ...newQuery };
+                    const oldQueryWithoutPage = { ...oldQuery };
+                    delete newQueryWithoutPage.page;
+                    delete oldQueryWithoutPage.page;
+
+                    if (JSON.stringify(newQueryWithoutPage) !== JSON.stringify(oldQueryWithoutPage)) {
+                        this.resetInfiniteScrollState();
+                    }
                 },
                 deep: true,
             },
         },
+
+        created() {
+            // Ensure we start at page 1
+            if (this.infiniteScroll && this.infiniteScroll.enabled) {
+                this.currentPage = 1;
+            }
+        },
     });
+
+    /**
+     * Helper method to reset infinite scroll state
+     */
+    app.config.globalProperties.resetInfiniteScrollState = function() {
+        if (this.infiniteScroll) {
+            this.infiniteScroll.hasMore = true;
+            this.infiniteScroll.loading = false;
+            this.currentPage = 1;
+            this.resources = [];
+        }
+    };
 });

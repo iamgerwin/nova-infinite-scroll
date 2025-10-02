@@ -52,6 +52,19 @@ class NovaInfiniteScrollServiceProvider extends ServiceProvider
     {
         $distPath = __DIR__.'/../dist';
 
+        // Inject configuration for JavaScript
+        $config = config('nova-infinite-scroll', []);
+        Nova::provideToScript([
+            'novaInfiniteScrollConfig' => [
+                'enabled' => $config['enabled'] ?? true,
+                'autoEnable' => $config['auto_enable'] ?? true,
+                'perPage' => $config['per_page'] ?? 25,
+                'threshold' => $config['threshold'] ?? 200,
+                'loadingText' => $config['loading_text'] ?? 'Loading more records...',
+                'endText' => $config['end_text'] ?? 'All records loaded',
+            ],
+        ]);
+
         if (file_exists($distPath.'/js/tool.js')) {
             Nova::script('nova-infinite-scroll', $distPath.'/js/tool.js');
         }
