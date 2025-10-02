@@ -124,3 +124,29 @@
 .dark .resource-table thead {
     background: var(--gray-800);
 }
+
+/* Hide pagination when infinite scroll is enabled */
+.nova-infinite-scroll-enabled .pagination-wrapper,
+.nova-infinite-scroll-enabled nav[role="navigation"] {
+    display: none !important;
+}
+
+/* Loading state for infinite scroll */
+.nova-infinite-scroll-enabled.loading {
+    position: relative;
+}
+
+.nova-infinite-scroll-enabled.loading::after {
+    content: '';
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--primary-500);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 1000;
+}
