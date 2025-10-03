@@ -190,6 +190,10 @@ In your `config/nova-infinite-scroll.php`:
 - Confirm the resource isn't in `excluded_resources`
 - Clear browser cache and reload the page
 
+### Default pagination not working?
+
+If you're experiencing issues with default pagination (clicking "Next" does nothing), ensure you're using the latest version. Versions prior to 1.1.0 had a critical bug that broke pagination for resources without the trait.
+
 ### Loading indicator doesn't show?
 
 - Check if Nova's default styles are loaded

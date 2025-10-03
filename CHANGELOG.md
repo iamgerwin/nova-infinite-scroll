@@ -6,10 +6,14 @@ All notable changes to `nova-infinite-scroll` will be documented in this file.
 
 ### Fixed
 
+- **CRITICAL**: Fixed broken default pagination that made resources unusable when package was installed
+- Removed selectPage override that was breaking normal pagination for resources without the trait
+- Infinite scroll now uses its own loading method without interfering with Nova's pagination
 - **Per-Resource Detection**: Fixed critical issue where infinite scroll was not properly detecting which resources have the trait enabled
 - JavaScript now correctly checks resource-specific configuration via `additionalInformation` meta data
 - Pagination controls now properly hide only for resources with the trait
 - Global configuration no longer applies to all resources by default (breaking change, see below)
+- Added proper cleanup of CSS classes when destroying infinite scroll
 
 ### Changed
 
