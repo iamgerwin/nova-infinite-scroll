@@ -19,7 +19,6 @@ Nova.booting((app, store) => {
                     loading: false,
                     hasMore: true,
                     threshold: 200,
-                    originalSelectPage: null,
                     resourceConfig: null,
                 },
             };
@@ -48,6 +47,8 @@ Nova.booting((app, store) => {
                 const resourceConfig = this.getResourceInfiniteScrollConfig();
 
                 if (!resourceConfig || resourceConfig.enabled === false) {
+                    // Infinite scroll not enabled for this resource
+                    // Don't interfere with normal pagination
                     return;
                 }
 
@@ -57,12 +58,6 @@ Nova.booting((app, store) => {
                 this.infiniteScroll.threshold = resourceConfig.threshold || 200;
 
                 if (this.infiniteScroll.enabled) {
-                    // Store the original selectPage method
-                    this.infiniteScroll.originalSelectPage = this.selectPage;
-
-                    // Override selectPage method
-                    this.selectPage = this.infiniteScrollSelectPage;
-
                     this.$nextTick(() => {
                         this.attachScrollListener();
                         this.hidePagination();
@@ -136,20 +131,36 @@ Nova.booting((app, store) => {
                 }
 
                 this.infiniteScroll.loading = true;
+                this.loading = true;
 
                 try {
                     // Get next page number
                     const nextPage = this.currentPage + 1;
 
-                    // Fetch next page
-                    await this.selectPage(nextPage);
+                    // Fetch next page data directly without overriding selectPage
+                    const {
+                        data: { resources, softDeletes, perPage, total, prev_page_url, next_page_url },
+                    } = await this.getResources(nextPage);
+
+                    // Append resources instead of replacing
+                    this.resources = [...this.resources, ...resources];
+                    this.softDeletes = softDeletes;
+                    this.perPage = perPage;
+                    this.currentPage = nextPage;
+                    this.hasMorePages = !!next_page_url;
 
                     // Check if there are more pages
                     this.infiniteScroll.hasMore = this.hasMorePages;
+
+                    Nova.$emit('resources-loaded', {
+                        resourceName: this.resourceName,
+                        mode: 'index',
+                    });
                 } catch (error) {
                     console.error('Error loading more records:', error);
                 } finally {
                     this.infiniteScroll.loading = false;
+                    this.loading = false;
                 }
             },
 
@@ -189,47 +200,11 @@ Nova.booting((app, store) => {
                     this._handleScroll = null;
                 }
 
-                // Restore original selectPage if it was overridden
-                if (this.infiniteScroll.originalSelectPage) {
-                    this.selectPage = this.infiniteScroll.originalSelectPage;
+                // Remove the class when destroying
+                const resourceIndex = this.$el?.closest('.resource-index') || this.$el;
+                if (resourceIndex) {
+                    resourceIndex.classList.remove('nova-infinite-scroll-enabled');
                 }
-            },
-
-            /**
-             * Custom selectPage that appends resources instead of replacing
-             */
-            async infiniteScrollSelectPage(page) {
-                if (!this.infiniteScroll.enabled || !this.infiniteScroll.originalSelectPage) {
-                    // Fallback to original method
-                    if (this.infiniteScroll.originalSelectPage) {
-                        return this.infiniteScroll.originalSelectPage.call(this, page);
-                    }
-                    return;
-                }
-
-                this.loading = true;
-
-                try {
-                    const {
-                        data: { resources, softDeletes, perPage, total, prev_page_url, next_page_url },
-                    } = await this.getResources(page);
-
-                    // Append resources instead of replacing
-                    this.resources = [...this.resources, ...resources];
-                    this.softDeletes = softDeletes;
-                    this.perPage = perPage;
-                    this.currentPage = page;
-                    this.hasMorePages = !!next_page_url;
-
-                    Nova.$emit('resources-loaded', {
-                        resourceName: this.resourceName,
-                        mode: 'index',
-                    });
-                } catch (error) {
-                    console.error('Error fetching resources:', error);
-                }
-
-                this.loading = false;
             },
 
             /**
